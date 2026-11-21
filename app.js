@@ -129,10 +129,21 @@ const sound = {
     o.start(t);
     o.stop(t + ms / 1000 + 0.05);
   },
-  // צליל עדין להפעלת הצליל: שני צלילים רכים ועולים, שקטים יותר מצלילי המשחק
-  chime() {
-    this.tone(660, 220, 'sine', 0.12);
-    setTimeout(() => this.tone(880, 320, 'sine', 0.1), 140);
+  // "פופ" קצר ורך (לא מנגינה) כשמפעילים את הצליל: צליל שיורד מהר ונעלם
+  pop() {
+    if (!this.ctx || !this.out || !this.on) return;
+    const t = this.ctx.currentTime;
+    const o = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(700, t);
+    o.frequency.exponentialRampToValueAtTime(180, t + 0.08);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.25, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+    o.connect(g).connect(this.out);
+    o.start(t);
+    o.stop(t + 0.1);
   },
   click() { this.tone(880, 130, 'triangle', 0.3); },
   win() { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => this.tone(f, 260), i * 170)); },
@@ -233,7 +244,7 @@ function soundToggle() {
   onTap(btn, () => {
     sound.setOn(!sound.on);
     render();
-    if (sound.on) sound.chime(); // רק בהפעלה, כדי לשמוע שהצליל חזר
+    if (sound.on) sound.pop(); // רק בהפעלה, כדי לשמוע שהצליל חזר
   }, { gap: 700 });
   render();
   return btn;
