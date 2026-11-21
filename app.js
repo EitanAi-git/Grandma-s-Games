@@ -304,6 +304,7 @@ function showHome() {
     list,
     levelPicker(),
     (you || bot) ? h('p', { class: 'home-score', text: `ניצחונות שלך: ${you}  ·  ניצחונות המחשב: ${bot}` }) : null,
+    h('p', { class: 'version', text: 'גרסה ' + (self.APP_VERSION || '') }),
   ].filter(Boolean));
   window.scrollTo(0, 0);
 }
