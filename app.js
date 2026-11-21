@@ -228,7 +228,6 @@ function soundToggle() {
   onTap(btn, () => {
     sound.setOn(!sound.on);
     render();
-    sound.click(); // נשמע רק כשמדליקים
   }, { gap: 700 });
   render();
   return btn;
@@ -239,7 +238,7 @@ function levelPicker() {
   const row = h('div', { class: 'level-row' });
   const btns = LEVELS.map((l) => {
     const b = h('button', { class: 'level-btn' });
-    onTap(b, () => { level.set(l.id); render(); sound.click(); }, { gap: 600 });
+    onTap(b, () => { level.set(l.id); render(); }, { gap: 600 });
     row.append(b);
     return [l, b];
   });
