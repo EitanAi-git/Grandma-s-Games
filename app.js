@@ -182,12 +182,13 @@ function gameScreen(title, gameId) {
   if (!inGame) history.pushState({ game: true }, '');
   inGame = true;
   app.innerHTML = '';
-  const back = h('button', { class: 'big-btn light back-btn', text: '🏠 חזרה לתפריט' });
+  const back = h('button', { class: 'icon-btn home-btn', 'aria-label': 'חזרה לתפריט הראשי' },
+    h('span', { class: 'icon', text: '🏠' }), h('span', { class: 'label', text: 'תפריט' }));
   onTap(back, askExit);
   const status = h('div', { class: 'status' });
   const body = h('div', { class: 'game-body' });
   const footer = h('div');
-  app.append(h('div', { class: 'topbar' }, back, soundToggle()), h('h1', { class: 'game-title', text: title }), h('p', { class: 'game-level', text: 'רמה: ' + level.name() }), status, body, footer);
+  app.append(h('div', { class: 'topbar game-top' }, back, h('h1', { class: 'game-title', text: title }), soundToggle()), h('p', { class: 'game-level', text: 'רמה: ' + level.name() }), status, body, footer);
 
   return {
     body,
@@ -216,7 +217,7 @@ function gameScreen(title, gameId) {
 function soundToggle() {
   const icon = h('span', { class: 'icon' });
   const label = h('span', { class: 'label' });
-  const btn = h('button', { class: 'sound-icon-btn' }, icon, label);
+  const btn = h('button', { class: 'icon-btn sound-icon-btn' }, icon, label);
   const render = () => {
     icon.textContent = sound.on ? '🔊' : '🔇';
     label.textContent = sound.on ? 'צליל' : 'שקט';

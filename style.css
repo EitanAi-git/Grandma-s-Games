@@ -133,18 +133,20 @@ button:focus-visible { outline: 5px solid #ffb300; outline-offset: 3px; }
 .level-btn.on { background: var(--blue); color: #fff; border-color: var(--blue-dark); box-shadow: 0 6px 0 var(--blue-dark); }
 
 /* ---------- מסך משחק ---------- */
-.topbar { display: flex; align-items: stretch; gap: 16px; margin-bottom: 14px; }
+.topbar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
 .topbar.home-top { justify-content: flex-end; margin-bottom: 0; }
-.topbar .back-btn { flex: 1; width: auto; }
-.sound-icon-btn {
+
+/* כפתורי אייקון מרובעים: תפריט וצליל */
+.icon-btn {
   flex: none;
-  width: 104px;
+  width: 92px;
   min-height: 88px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 2px;
+  padding: 6px 0;
   border-radius: 22px;
   background: #fff;
   color: var(--blue);
@@ -152,19 +154,18 @@ button:focus-visible { outline: 5px solid #ffb300; outline-offset: 3px; }
   box-shadow: 0 6px 0 var(--line);
   transition: transform .08s, box-shadow .08s;
 }
-.sound-icon-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--line); }
-.sound-icon-btn .icon { font-size: 42px; line-height: 1; }
-.sound-icon-btn .label { font-size: 22px; font-weight: bold; }
+.icon-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--line); }
+.icon-btn .icon { font-size: 40px; line-height: 1; }
+.icon-btn .label { font-size: 21px; font-weight: bold; }
 .sound-icon-btn.off { background: #eee; color: var(--gray); border-color: var(--gray); }
-.back-btn {
-  min-height: 76px;
-  font-size: 28px;
-  padding: 10px 18px;
-}
+
 .game-title {
+  flex: 1;
+  min-width: 0;
   text-align: center;
-  font-size: 38px;
-  margin: 8px 0 4px;
+  font-size: clamp(28px, 8vw, 38px);
+  line-height: 1.15;
+  margin: 0;
 }
 .game-level {
   text-align: center;
