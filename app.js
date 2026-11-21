@@ -187,7 +187,7 @@ function gameScreen(title, gameId) {
   const status = h('div', { class: 'status' });
   const body = h('div', { class: 'game-body' });
   const footer = h('div');
-  app.append(h('div', { class: 'topbar' }, back), h('h1', { class: 'game-title', text: title }), h('p', { class: 'game-level', text: 'רמה: ' + level.name() }), status, body, footer);
+  app.append(h('div', { class: 'topbar' }, back, soundToggle()), h('h1', { class: 'game-title', text: title }), h('p', { class: 'game-level', text: 'רמה: ' + level.name() }), status, body, footer);
 
   return {
     body,
@@ -212,13 +212,17 @@ function gameScreen(title, gameId) {
   };
 }
 
-// כפתור צליל גדול: מראה את המצב הנוכחי בבירור
+// כפתור צליל בפינה העליונה: אייקון גדול + מילה, זמין גם באמצע משחק
 function soundToggle() {
-  const btn = h('button', { class: 'big-btn sound-btn' });
+  const icon = h('span', { class: 'icon' });
+  const label = h('span', { class: 'label' });
+  const btn = h('button', { class: 'sound-icon-btn' }, icon, label);
   const render = () => {
-    btn.textContent = sound.on ? '🔊 צליל: פועל' : '🔇 צליל: כבוי';
+    icon.textContent = sound.on ? '🔊' : '🔇';
+    label.textContent = sound.on ? 'צליל' : 'שקט';
     btn.classList.toggle('off', !sound.on);
     btn.setAttribute('aria-pressed', String(sound.on));
+    btn.setAttribute('aria-label', sound.on ? 'צליל פועל, לחצי להשתקה' : 'צליל כבוי, לחצי להפעלה');
   };
   onTap(btn, () => {
     sound.setOn(!sound.on);
@@ -275,11 +279,11 @@ function showHome() {
   Object.entries(s).forEach(([k, v]) => { if (k !== 'simon') { you += v.you; bot += v.bot; } });
 
   app.append(...[
+    h('div', { class: 'topbar home-top' }, soundToggle()),
     h('h1', { class: 'home-title', text: 'המשחקים של סבתא' }),
     h('p', { class: 'home-sub', text: 'במה נשחק היום?' }),
     list,
     levelPicker(),
-    soundToggle(),
     (you || bot) ? h('p', { class: 'home-score', text: `ניצחונות שלך: ${you}  ·  ניצחונות המחשב: ${bot}` }) : null,
   ].filter(Boolean));
   window.scrollTo(0, 0);
