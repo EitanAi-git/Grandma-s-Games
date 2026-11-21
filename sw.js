@@ -1,6 +1,7 @@
-const CACHE = 'grandma-games-v11';
+importScripts('version.js');
+const CACHE = 'grandma-games-' + self.APP_VERSION;
 const FILES = [
-  './', './index.html', './style.css', './app.js', './manifest.json',
+  './', './index.html', './style.css', './app.js', './version.js', './manifest.json',
   './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png'
 ];
 

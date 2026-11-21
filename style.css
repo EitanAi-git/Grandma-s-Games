@@ -132,6 +132,13 @@ button:focus-visible { outline: 5px solid #ffb300; outline-offset: 3px; }
 .level-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--line); }
 .level-btn.on { background: var(--blue); color: #fff; border-color: var(--blue-dark); box-shadow: 0 6px 0 var(--blue-dark); }
 
+.version {
+  margin: 28px 0 0;
+  text-align: center;
+  font-size: 13px;
+  color: #a8a294;
+}
+
 /* ---------- מסך משחק ---------- */
 .topbar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
 .topbar.home-top { justify-content: flex-end; margin-bottom: 0; }
