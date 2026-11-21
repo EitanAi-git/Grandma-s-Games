@@ -114,6 +114,16 @@ button:focus-visible { outline: 5px solid #ffb300; outline-offset: 3px; }
   color: var(--gray);
 }
 
+.sound-btn {
+  margin-top: 40px;
+  background: #fff;
+  color: var(--blue);
+  border: 4px solid var(--blue);
+  box-shadow: 0 6px 0 var(--line);
+}
+.sound-btn:active { box-shadow: 0 2px 0 var(--line); }
+.sound-btn.off { color: var(--gray); border-color: var(--gray); background: #eee; }
+
 /* ---------- מסך משחק ---------- */
 .topbar { margin-bottom: 14px; }
 .back-btn {
