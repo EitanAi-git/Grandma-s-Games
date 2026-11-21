@@ -32,7 +32,8 @@ html, body {
 }
 
 #app {
-  min-height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
   max-width: 640px;
   margin: 0 auto;
   padding: max(16px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
@@ -205,28 +206,41 @@ button:focus-visible { outline: 5px solid #ffb300; outline-offset: 3px; }
 }
 .scoreline b { font-size: 34px; }
 
+/* ---------- התאמת המשחק לגובה המסך ---------- */
+/* במסך משחק: הכל נכנס בדיוק במסך, והלוח מקבל את כל השטח שנשאר */
+#app.game-mode { height: 100vh; height: 100dvh; }
+.game-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.fit {
+  flex: 1;
+  min-height: 0;
+  container-type: size;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* ---------- איקס עיגול ---------- */
 .ttt {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   grid-template-rows: repeat(3, 1fr);
   gap: 12px;
-  width: min(100%, 520px);
-  margin: 0 auto;
+  width: min(100cqw, 100cqh, 520px);
   aspect-ratio: 1;
 }
 .ttt .cell {
+  container-type: inline-size;
   background: #fff;
   border: 4px solid var(--line);
   border-radius: 20px;
   min-height: 0;
-  font-size: clamp(64px, 20vw, 120px);
   font-weight: bold;
   line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
 }
+.ttt .cell .mark { font-size: 72cqw; line-height: 1; }
 .ttt .cell.x { color: var(--green); }
 .ttt .cell.o { color: var(--red); }
 .ttt .cell.win { background: #fff3b0; border-color: #e0b400; }
@@ -239,8 +253,7 @@ button:focus-visible { outline: 5px solid #ffb300; outline-offset: 3px; }
   grid-template-columns: 1fr 1fr;
   grid-template-rows: 1fr 1fr;
   gap: 20px;
-  width: min(100%, 520px);
-  margin: 0 auto;
+  width: min(100cqw, 100cqh, 520px);
   aspect-ratio: 1;
 }
 .pad {
@@ -265,8 +278,7 @@ button:focus-visible { outline: 5px solid #ffb300; outline-offset: 3px; }
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 4px;
-  width: min(100%, 560px);
-  margin: 0 auto;
+  width: min(100cqw, calc((100cqh - 2px) * 7 / 6 + 47px), 560px);
   padding: 8px 6px;
   background: var(--blue);
   border-radius: 20px;
@@ -301,18 +313,17 @@ button:focus-visible { outline: 5px solid #ffb300; outline-offset: 3px; }
 /* ---------- זיכרון ---------- */
 .memory {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
-  width: min(100%, 520px);
-  margin: 0 auto;
+  grid-template-columns: repeat(var(--cols), 1fr);
+  gap: var(--gap);
+  /* רוחב שבו גם הגובה (שורות של קלפים מרובעים) נכנס */
+  width: min(100cqw, calc(var(--cols) * (100cqh - (var(--rows) - 1) * var(--gap)) / var(--rows) + (var(--cols) - 1) * var(--gap)), 520px);
 }
-.memory.cols-4 { grid-template-columns: repeat(4, 1fr); gap: 10px; }
-.memory.cols-4 .mcard { font-size: clamp(34px, 10.5vw, 60px); border-radius: 14px; }
 .mcard {
+  container-type: inline-size;
   aspect-ratio: 1 / 1;
-  border-radius: 18px;
-  font-size: clamp(44px, 14vw, 76px);
+  border-radius: 16px;
   line-height: 1;
+  padding: 0;
   background: var(--blue);
   border: 4px solid var(--blue-dark);
   color: #fff;
@@ -320,7 +331,8 @@ button:focus-visible { outline: 5px solid #ffb300; outline-offset: 3px; }
   align-items: center;
   justify-content: center;
 }
-.mcard .back { font-size: .6em; opacity: .6; }
+.mcard .face { font-size: 62cqw; line-height: 1; }
+.mcard .back { font-size: 38cqw; opacity: .6; }
 .mcard.open { background: #fff; border-color: var(--line); }
 .mcard.found-you { background: #e3f6e5; border-color: var(--green); }
 .mcard.found-bot { background: #eef3fb; border-color: var(--blue); opacity: .85; }
@@ -329,11 +341,12 @@ button:focus-visible { outline: 5px solid #ffb300; outline-offset: 3px; }
 
 /* ---------- סיום משחק ---------- */
 .result {
-  margin-top: 22px;
+  margin-top: 16px;
   display: flex;
   flex-direction: column;
-  gap: 26px;
+  gap: 22px;
 }
+.result .big-btn { min-height: 84px; }
 .result-text {
   text-align: center;
   font-size: 44px;
@@ -366,3 +379,43 @@ button:focus-visible { outline: 5px solid #ffb300; outline-offset: 3px; }
   margin: 0 0 28px;
 }
 .modal-buttons { display: flex; flex-direction: column; gap: 34px; }
+
+/* ---------- התאמות לגודל המסך (בסוף הקובץ כדי לגבור על הכללים הרגילים) ---------- */
+/* לוח לא נעלם לעולם: אם אין מקום בכלל, עדיף גלילה קטנה */
+.fit { min-height: 160px; }
+
+/* מסכים נמוכים: כותרת וסטטוס קומפקטיים יותר כדי להשאיר מקום ללוח */
+@media (max-height: 760px) {
+  #app { padding-top: max(10px, env(safe-area-inset-top)); padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+  .topbar { margin-bottom: 6px; }
+  .icon-btn { width: 80px; min-height: 72px; border-radius: 18px; }
+  .icon-btn .icon { font-size: 32px; }
+  .icon-btn .label { font-size: 18px; }
+  .game-title { font-size: clamp(24px, 7vw, 32px); }
+  .game-level { font-size: 20px; margin: 0 0 2px; }
+  .status { font-size: 28px; min-height: 2.5em; padding: 4px 8px; margin: 4px 0 8px; }
+  .scoreline { font-size: 22px; margin-bottom: 8px; }
+  .scoreline b { font-size: 26px; }
+  /* בסוף משחק: שני הכפתורים זה לצד זה, עם רווח גדול ביניהם */
+  .result { flex-direction: row; gap: 24px; margin-top: 10px; }
+  .result .big-btn { font-size: 26px; min-height: 80px; padding: 10px 8px; }
+}
+
+/* טלפון שוכב: הכותרת והסטטוס בצד אחד, הלוח בצד השני */
+@media (orientation: landscape) and (max-height: 600px) {
+  #app.game-mode {
+    max-width: 1000px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+    grid-template-rows: auto auto auto 1fr;
+    column-gap: 24px;
+    align-content: start;
+  }
+  #app.game-mode > .game-body { grid-column: 2; grid-row: 1 / span 4; min-height: 0; }
+  #app.game-mode > :not(.game-body) { grid-column: 1; }
+  #app.game-mode > div:last-child:not(.game-body) { grid-row: 4; }
+  .fit { min-height: 0; }
+  .game-level { display: none; }
+  .result { gap: 16px; margin-top: 6px; }
+  .result .big-btn { font-size: 22px; min-height: 70px; padding: 8px 6px; }
+}
