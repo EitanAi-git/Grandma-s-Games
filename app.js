@@ -129,6 +129,24 @@ const sound = {
     o.start(t);
     o.stop(t + ms / 1000 + 0.05);
   },
+  // "דינג" אחד, כמו פעמון קטן: מכה אחת שדועכת לאט (צליל אחד, לא מנגינה)
+  ding() {
+    if (!this.ctx || !this.out || !this.on) return;
+    const t = this.ctx.currentTime;
+    // צליל יסוד + צליל עליון קצר שנותן את ה"פעמון"
+    for (const [freq, vol, len] of [[1320, 0.16, 0.9], [1320 * 2.76, 0.05, 0.3]]) {
+      const o = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      o.type = 'sine';
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+      o.connect(g).connect(this.out);
+      o.start(t);
+      o.stop(t + len + 0.05);
+    }
+  },
   click() { this.tone(880, 130, 'triangle', 0.3); },
   win() { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => this.tone(f, 260), i * 170)); },
   lose() { [784, 659, 523].forEach((f, i) => setTimeout(() => this.tone(f, 340), i * 240)); },
@@ -182,12 +200,13 @@ function gameScreen(title, gameId) {
   if (!inGame) history.pushState({ game: true }, '');
   inGame = true;
   app.innerHTML = '';
-  const back = h('button', { class: 'big-btn light back-btn', text: '🏠 חזרה לתפריט' });
+  const back = h('button', { class: 'icon-btn home-btn', 'aria-label': 'חזרה לתפריט הראשי' },
+    h('span', { class: 'icon', text: '🏠' }), h('span', { class: 'label', text: 'תפריט' }));
   onTap(back, askExit);
   const status = h('div', { class: 'status' });
   const body = h('div', { class: 'game-body' });
   const footer = h('div');
-  app.append(h('div', { class: 'topbar' }, back, soundToggle()), h('h1', { class: 'game-title', text: title }), h('p', { class: 'game-level', text: 'רמה: ' + level.name() }), status, body, footer);
+  app.append(h('div', { class: 'topbar game-top' }, back, h('h1', { class: 'game-title', text: title }), soundToggle()), h('p', { class: 'game-level', text: 'רמה: ' + level.name() }), status, body, footer);
 
   return {
     body,
@@ -216,7 +235,7 @@ function gameScreen(title, gameId) {
 function soundToggle() {
   const icon = h('span', { class: 'icon' });
   const label = h('span', { class: 'label' });
-  const btn = h('button', { class: 'sound-icon-btn' }, icon, label);
+  const btn = h('button', { class: 'icon-btn sound-icon-btn' }, icon, label);
   const render = () => {
     icon.textContent = sound.on ? '🔊' : '🔇';
     label.textContent = sound.on ? 'צליל' : 'שקט';
@@ -227,7 +246,7 @@ function soundToggle() {
   onTap(btn, () => {
     sound.setOn(!sound.on);
     render();
-    sound.click(); // נשמע רק כשמדליקים
+    if (sound.on) sound.ding(); // רק בהפעלה, כדי לשמוע שהצליל חזר
   }, { gap: 700 });
   render();
   return btn;
@@ -238,7 +257,7 @@ function levelPicker() {
   const row = h('div', { class: 'level-row' });
   const btns = LEVELS.map((l) => {
     const b = h('button', { class: 'level-btn' });
-    onTap(b, () => { level.set(l.id); render(); sound.click(); }, { gap: 600 });
+    onTap(b, () => { level.set(l.id); render(); }, { gap: 600 });
     row.append(b);
     return [l, b];
   });
