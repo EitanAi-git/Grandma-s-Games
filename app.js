@@ -71,6 +71,11 @@ const store = {
 /* ---------- צלילים ---------- */
 const sound = {
   ctx: null,
+  on: (() => { try { return localStorage.getItem('gg-sound') !== 'off'; } catch { return true; } })(),
+  setOn(v) {
+    this.on = v;
+    try { localStorage.setItem('gg-sound', v ? 'on' : 'off'); } catch { /* לא נורא */ }
+  },
   unlock() {
     if (!this.ctx) {
       try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return; }
@@ -78,7 +83,7 @@ const sound = {
     if (this.ctx.state === 'suspended') this.ctx.resume();
   },
   tone(freq, ms = 300, type = 'sine', vol = 0.25) {
-    if (!this.ctx) return;
+    if (!this.ctx || !this.on) return;
     const t = this.ctx.currentTime;
     const o = this.ctx.createOscillator();
     const g = this.ctx.createGain();
@@ -174,6 +179,23 @@ function gameScreen(title, gameId) {
   };
 }
 
+// כפתור צליל גדול: מראה את המצב הנוכחי בבירור
+function soundToggle() {
+  const btn = h('button', { class: 'big-btn sound-btn' });
+  const render = () => {
+    btn.textContent = sound.on ? '🔊 צליל: פועל' : '🔇 צליל: כבוי';
+    btn.classList.toggle('off', !sound.on);
+    btn.setAttribute('aria-pressed', String(sound.on));
+  };
+  onTap(btn, () => {
+    sound.setOn(!sound.on);
+    render();
+    sound.click(); // נשמע רק כשמדליקים
+  }, { gap: 700 });
+  render();
+  return btn;
+}
+
 function showHome() {
   clearTimers();
   if (inGame) { inGame = false; history.back(); }
@@ -201,6 +223,7 @@ function showHome() {
     h('h1', { class: 'home-title', text: 'המשחקים של סבתא' }),
     h('p', { class: 'home-sub', text: 'במה נשחק היום?' }),
     list,
+    soundToggle(),
     (you || bot) ? h('p', { class: 'home-score', text: `ניצחונות שלך: ${you}  ·  ניצחונות המחשב: ${bot}` }) : null,
   ].filter(Boolean));
   window.scrollTo(0, 0);
