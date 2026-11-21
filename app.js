@@ -88,6 +88,7 @@ const level = {
 /* ---------- צלילים ---------- */
 const sound = {
   ctx: null,
+  out: null,
   on: (() => { try { return localStorage.getItem('gg-sound') !== 'off'; } catch { return true; } })(),
   setOn(v) {
     this.on = v;
@@ -98,9 +99,24 @@ const sound = {
       try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return; }
     }
     if (this.ctx.state === 'suspended') this.ctx.resume();
+    if (!this.out) {
+      // מגבר + מגביל: צליל חזק בלי רעשים/צרימות
+      const boost = this.ctx.createGain();
+      boost.gain.value = 4;
+      const limiter = this.ctx.createDynamicsCompressor();
+      limiter.threshold.value = -2;
+      limiter.knee.value = 0;
+      limiter.ratio.value = 20;
+      limiter.attack.value = 0.002;
+      limiter.release.value = 0.1;
+      const post = this.ctx.createGain();
+      post.gain.value = 1.4; // הגבר סופי עד קרוב למקסימום
+      boost.connect(limiter).connect(post).connect(this.ctx.destination);
+      this.out = boost;
+    }
   },
-  tone(freq, ms = 300, type = 'sine', vol = 0.25) {
-    if (!this.ctx || !this.on) return;
+  tone(freq, ms = 300, type = 'triangle', vol = 0.35) {
+    if (!this.ctx || !this.out || !this.on) return;
     const t = this.ctx.currentTime;
     const o = this.ctx.createOscillator();
     const g = this.ctx.createGain();
@@ -109,14 +125,14 @@ const sound = {
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
     g.gain.exponentialRampToValueAtTime(0.0001, t + ms / 1000);
-    o.connect(g).connect(this.ctx.destination);
+    o.connect(g).connect(this.out);
     o.start(t);
     o.stop(t + ms / 1000 + 0.05);
   },
-  click() { this.tone(520, 120, 'triangle', 0.18); },
+  click() { this.tone(880, 130, 'triangle', 0.3); },
   win() { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => this.tone(f, 260), i * 170)); },
-  lose() { [392, 330, 262].forEach((f, i) => setTimeout(() => this.tone(f, 320, 'triangle'), i * 220)); },
-  draw() { [440, 440].forEach((f, i) => setTimeout(() => this.tone(f, 220), i * 260)); },
+  lose() { [784, 659, 523].forEach((f, i) => setTimeout(() => this.tone(f, 340), i * 240)); },
+  draw() { [660, 660].forEach((f, i) => setTimeout(() => this.tone(f, 240), i * 280)); },
 };
 
 /* ---------- חלון אישור ---------- */
@@ -302,7 +318,7 @@ function startTicTacToe() {
     board[i] = mark;
     cells[i].textContent = mark;
     cells[i].classList.add(mark.toLowerCase(), 'new');
-    sound.tone(mark === 'X' ? 600 : 400, 150, 'triangle', 0.2);
+    sound.tone(mark === 'X' ? 880 : 660, 160, 'triangle', 0.35);
   }
 
   function winner() {
@@ -409,10 +425,10 @@ function startTicTacToe() {
    ========================================================= */
 
 const PADS = [
-  { cls: 'green',  name: 'ירוק',  freq: 392 },
-  { cls: 'red',    name: 'אדום',  freq: 330 },
-  { cls: 'yellow', name: 'צהוב',  freq: 262 },
-  { cls: 'blue',   name: 'כחול',  freq: 523 },
+  { cls: 'green',  name: 'ירוק',  freq: 784 },
+  { cls: 'red',    name: 'אדום',  freq: 659 },
+  { cls: 'yellow', name: 'צהוב',  freq: 523 },
+  { cls: 'blue',   name: 'כחול',  freq: 1047 },
 ];
 
 const SIMON_SPEED = {
@@ -444,7 +460,7 @@ function startSimon() {
 
   async function flash(i, ms = speed.on) {
     pads[i].classList.add('lit');
-    sound.tone(PADS[i].freq, ms, 'sine', 0.3);
+    sound.tone(PADS[i].freq, ms, 'triangle', 0.4);
     await wait(ms);
     pads[i].classList.remove('lit');
   }
@@ -701,7 +717,7 @@ function startConnectFour() {
     board[r][c] = p;
     render();
     cells[r][c].classList.add('drop');
-    sound.tone(p === YOU ? 600 : 400, 150, 'triangle', 0.2);
+    sound.tone(p === YOU ? 880 : 660, 160, 'triangle', 0.35);
   }
 
   function playerTap(c) {
