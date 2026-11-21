@@ -195,11 +195,17 @@ window.addEventListener('popstate', () => {
   }
 });
 
+// עוטף לוח משחק כך שיתאים בדיוק לשטח הפנוי במסך (בלי גלילה), ושומר על הצורה שלו
+function fit(board) {
+  return h('div', { class: 'fit' }, board);
+}
+
 function gameScreen(title, gameId) {
   clearTimers();
   if (!inGame) history.pushState({ game: true }, '');
   inGame = true;
   app.innerHTML = '';
+  app.classList.add('game-mode');
   const back = h('button', { class: 'icon-btn home-btn', 'aria-label': 'חזרה לתפריט הראשי' },
     h('span', { class: 'icon', text: '🏠' }), h('span', { class: 'label', text: 'תפריט' }));
   onTap(back, askExit);
@@ -277,6 +283,7 @@ function showHome() {
   clearTimers();
   if (inGame) { inGame = false; history.back(); }
   app.innerHTML = '';
+  app.classList.remove('game-mode');
   const games = [
     { emoji: '❌⭕', name: 'איקס עיגול', desc: 'שלוש בשורה', start: startTicTacToe },
     { emoji: '🔴🟡', name: 'ארבע בשורה', desc: 'ארבע דיסקיות בשורה', start: startConnectFour },
@@ -335,12 +342,12 @@ function startTicTacToe() {
       h('span', {}, 'את: ', h('b', { class: 'x-mark', text: 'X', style: 'color:var(--green)' })),
       h('span', {}, 'המחשב: ', h('b', { text: 'O', style: 'color:var(--red)' })),
     ),
-    grid,
+    fit(grid),
   );
 
   function place(i, mark) {
     board[i] = mark;
-    cells[i].textContent = mark;
+    cells[i].append(h('span', { class: 'mark', text: mark }));
     cells[i].classList.add(mark.toLowerCase(), 'new');
     sound.tone(mark === 'X' ? 880 : 660, 160, 'triangle', 0.35);
   }
@@ -480,7 +487,7 @@ function startSimon() {
     return b;
   });
   const roundEl = h('div', { class: 'scoreline' });
-  ui.body.append(roundEl, grid);
+  ui.body.append(roundEl, fit(grid));
 
   async function flash(i, ms = speed.on) {
     pads[i].classList.add('lit');
@@ -720,7 +727,7 @@ function startConnectFour() {
       h('span', {}, 'את: ', h('span', { class: 'disc you' })),
       h('span', {}, 'המחשב: ', h('span', { class: 'disc bot' })),
     ),
-    grid,
+    fit(grid),
   );
 
   function render() {
@@ -828,14 +835,18 @@ function startMemory() {
   const score = { you: 0, bot: 0 };
 
   const scoreEl = h('div', { class: 'scoreline' });
-  const grid = h('div', { class: `memory cols-${size.cols}` });
+  const rows = (size.pairs * 2) / size.cols;
+  const grid = h('div', {
+    class: 'memory',
+    style: `--cols:${size.cols};--rows:${rows};--gap:${size.cols === 3 ? 14 : 10}px`,
+  });
   const cards = deck.map((_, i) => {
     const c = h('button', { class: 'mcard', 'aria-label': `קלף ${i + 1}` });
     onTap(c, () => { if (turn === 'you' && !busy) flip(i); }, { gap: 500 });
     grid.append(c);
     return c;
   });
-  ui.body.append(scoreEl, grid);
+  ui.body.append(scoreEl, fit(grid));
 
   function render() {
     cards.forEach((c, i) => {
@@ -843,7 +854,7 @@ function startMemory() {
       c.className = 'mcard' + (s === 'open' ? ' open' : s === 'you' ? ' found-you' : s === 'bot' ? ' found-bot' : '');
       c.innerHTML = '';
       if (s === 'closed') c.append(h('span', { class: 'back', text: '❓' }));
-      else c.textContent = deck[i];
+      else c.append(h('span', { class: 'face', text: deck[i] }));
     });
     scoreEl.innerHTML = '';
     scoreEl.append(h('span', {}, 'זוגות שלך: ', h('b', { text: String(score.you) })),
