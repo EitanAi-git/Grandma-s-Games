@@ -129,6 +129,11 @@ const sound = {
     o.start(t);
     o.stop(t + ms / 1000 + 0.05);
   },
+  // צליל עדין להפעלת הצליל: שני צלילים רכים ועולים, שקטים יותר מצלילי המשחק
+  chime() {
+    this.tone(660, 220, 'sine', 0.12);
+    setTimeout(() => this.tone(880, 320, 'sine', 0.1), 140);
+  },
   click() { this.tone(880, 130, 'triangle', 0.3); },
   win() { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => this.tone(f, 260), i * 170)); },
   lose() { [784, 659, 523].forEach((f, i) => setTimeout(() => this.tone(f, 340), i * 240)); },
@@ -228,6 +233,7 @@ function soundToggle() {
   onTap(btn, () => {
     sound.setOn(!sound.on);
     render();
+    if (sound.on) sound.chime(); // רק בהפעלה, כדי לשמוע שהצליל חזר
   }, { gap: 700 });
   render();
   return btn;
