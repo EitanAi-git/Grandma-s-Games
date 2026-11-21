@@ -68,9 +68,27 @@ const store = {
   },
 };
 
+/* ---------- רמת קושי ---------- */
+const LEVELS = [
+  { id: 'easy', name: 'קל' },
+  { id: 'medium', name: 'בינוני' },
+  { id: 'hard', name: 'קשה' },
+];
+const level = {
+  get() {
+    try {
+      const v = localStorage.getItem('gg-level');
+      return LEVELS.some((l) => l.id === v) ? v : 'easy';
+    } catch { return 'easy'; }
+  },
+  set(v) { try { localStorage.setItem('gg-level', v); } catch { /* לא נורא */ } },
+  name() { return LEVELS.find((l) => l.id === this.get()).name; },
+};
+
 /* ---------- צלילים ---------- */
 const sound = {
   ctx: null,
+  out: null,
   on: (() => { try { return localStorage.getItem('gg-sound') !== 'off'; } catch { return true; } })(),
   setOn(v) {
     this.on = v;
@@ -81,9 +99,24 @@ const sound = {
       try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return; }
     }
     if (this.ctx.state === 'suspended') this.ctx.resume();
+    if (!this.out) {
+      // מגבר + מגביל: צליל חזק בלי רעשים/צרימות
+      const boost = this.ctx.createGain();
+      boost.gain.value = 4;
+      const limiter = this.ctx.createDynamicsCompressor();
+      limiter.threshold.value = -2;
+      limiter.knee.value = 0;
+      limiter.ratio.value = 20;
+      limiter.attack.value = 0.002;
+      limiter.release.value = 0.1;
+      const post = this.ctx.createGain();
+      post.gain.value = 1.4; // הגבר סופי עד קרוב למקסימום
+      boost.connect(limiter).connect(post).connect(this.ctx.destination);
+      this.out = boost;
+    }
   },
-  tone(freq, ms = 300, type = 'sine', vol = 0.25) {
-    if (!this.ctx || !this.on) return;
+  tone(freq, ms = 300, type = 'triangle', vol = 0.35) {
+    if (!this.ctx || !this.out || !this.on) return;
     const t = this.ctx.currentTime;
     const o = this.ctx.createOscillator();
     const g = this.ctx.createGain();
@@ -92,14 +125,14 @@ const sound = {
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
     g.gain.exponentialRampToValueAtTime(0.0001, t + ms / 1000);
-    o.connect(g).connect(this.ctx.destination);
+    o.connect(g).connect(this.out);
     o.start(t);
     o.stop(t + ms / 1000 + 0.05);
   },
-  click() { this.tone(520, 120, 'triangle', 0.18); },
+  click() { this.tone(880, 130, 'triangle', 0.3); },
   win() { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => this.tone(f, 260), i * 170)); },
-  lose() { [392, 330, 262].forEach((f, i) => setTimeout(() => this.tone(f, 320, 'triangle'), i * 220)); },
-  draw() { [440, 440].forEach((f, i) => setTimeout(() => this.tone(f, 220), i * 260)); },
+  lose() { [784, 659, 523].forEach((f, i) => setTimeout(() => this.tone(f, 340), i * 240)); },
+  draw() { [660, 660].forEach((f, i) => setTimeout(() => this.tone(f, 240), i * 280)); },
 };
 
 /* ---------- חלון אישור ---------- */
@@ -154,7 +187,7 @@ function gameScreen(title, gameId) {
   const status = h('div', { class: 'status' });
   const body = h('div', { class: 'game-body' });
   const footer = h('div');
-  app.append(h('div', { class: 'topbar' }, back), h('h1', { class: 'game-title', text: title }), status, body, footer);
+  app.append(h('div', { class: 'topbar' }, back), h('h1', { class: 'game-title', text: title }), h('p', { class: 'game-level', text: 'רמה: ' + level.name() }), status, body, footer);
 
   return {
     body,
@@ -163,9 +196,9 @@ function gameScreen(title, gameId) {
       status.className = 'status' + (who ? ' ' + who : '');
     },
     // מסך סיום עם "לשחק שוב"
-    finish(text, who, restart) {
-      if (who === 'you') { sound.win(); store.win(gameId, 'you'); }
-      else if (who === 'bot') { sound.lose(); store.win(gameId, 'bot'); }
+    finish(text, who, restart, countScore = true) {
+      if (who === 'you') { sound.win(); if (countScore) store.win(gameId, 'you'); }
+      else if (who === 'bot') { sound.lose(); if (countScore) store.win(gameId, 'bot'); }
       else sound.draw();
       this.setStatus(text, who === 'you' ? 'you' : who === 'bot' ? 'bot' : '');
       footer.innerHTML = '';
@@ -196,14 +229,36 @@ function soundToggle() {
   return btn;
 }
 
+// בחירת רמת קושי: שלושה כפתורים גדולים, הנבחר מסומן בבירור
+function levelPicker() {
+  const row = h('div', { class: 'level-row' });
+  const btns = LEVELS.map((l) => {
+    const b = h('button', { class: 'level-btn' });
+    onTap(b, () => { level.set(l.id); render(); sound.click(); }, { gap: 600 });
+    row.append(b);
+    return [l, b];
+  });
+  function render() {
+    const cur = level.get();
+    for (const [l, b] of btns) {
+      b.textContent = (l.id === cur ? '✓ ' : '') + l.name;
+      b.classList.toggle('on', l.id === cur);
+      b.setAttribute('aria-pressed', String(l.id === cur));
+    }
+  }
+  render();
+  return h('div', { class: 'level-box' }, h('p', { class: 'level-title', text: 'רמת קושי:' }), row);
+}
+
 function showHome() {
   clearTimers();
   if (inGame) { inGame = false; history.back(); }
   app.innerHTML = '';
   const games = [
     { emoji: '❌⭕', name: 'איקס עיגול', desc: 'שלוש בשורה', start: startTicTacToe },
-    { emoji: '🎨', name: 'סיימון', desc: 'לזכור את הצבעים', start: startSimon },
+    { emoji: '🔴🟡', name: 'ארבע בשורה', desc: 'ארבע דיסקיות בשורה', start: startConnectFour },
     { emoji: '🃏', name: 'זיכרון', desc: 'למצוא זוגות', start: startMemory },
+    { emoji: '🎨', name: 'סיימון', desc: 'לזכור צבעים ולשבור שיא', start: startSimon },
   ];
   const list = h('div', { class: 'game-list' });
   for (const g of games) {
@@ -217,12 +272,13 @@ function showHome() {
 
   const s = store.get();
   let you = 0, bot = 0;
-  Object.values(s).forEach((v) => { you += v.you; bot += v.bot; });
+  Object.entries(s).forEach(([k, v]) => { if (k !== 'simon') { you += v.you; bot += v.bot; } });
 
   app.append(...[
     h('h1', { class: 'home-title', text: 'המשחקים של סבתא' }),
     h('p', { class: 'home-sub', text: 'במה נשחק היום?' }),
     list,
+    levelPicker(),
     soundToggle(),
     (you || bot) ? h('p', { class: 'home-score', text: `ניצחונות שלך: ${you}  ·  ניצחונות המחשב: ${bot}` }) : null,
   ].filter(Boolean));
@@ -262,7 +318,7 @@ function startTicTacToe() {
     board[i] = mark;
     cells[i].textContent = mark;
     cells[i].classList.add(mark.toLowerCase(), 'new');
-    sound.tone(mark === 'X' ? 600 : 400, 150, 'triangle', 0.2);
+    sound.tone(mark === 'X' ? 880 : 660, 160, 'triangle', 0.35);
   }
 
   function winner() {
@@ -306,8 +362,39 @@ function startTicTacToe() {
     }, 1100);
   }
 
-  // בוט לא חכם מדי: לפעמים מפספס
+  // מינימקס: המהלך הטוב ביותר (לרמה הקשה)
+  function bestMove() {
+    const score = (turn, depth) => {
+      const w = winner();
+      if (w) return w.mark === 'O' ? 10 - depth : w.mark === 'X' ? depth - 10 : 0;
+      let best = turn === 'O' ? -Infinity : Infinity;
+      for (let i = 0; i < 9; i++) {
+        if (board[i]) continue;
+        board[i] = turn;
+        const v = score(turn === 'O' ? 'X' : 'O', depth + 1);
+        board[i] = null;
+        best = turn === 'O' ? Math.max(best, v) : Math.min(best, v);
+      }
+      return best;
+    };
+    let bestI = null, bestV = -Infinity;
+    for (const i of shuffle([0, 1, 2, 3, 4, 5, 6, 7, 8])) {
+      if (board[i]) continue;
+      board[i] = 'O';
+      const v = score('X', 1);
+      board[i] = null;
+      if (v > bestV) { bestV = v; bestI = i; }
+    }
+    return bestI;
+  }
+
+  // הבוט לפי רמת הקושי
   function botChoice() {
+    const lvl = level.get();
+    if (lvl === 'hard' && Math.random() < 0.9) return bestMove();
+    const odds = lvl === 'easy'
+      ? { win: 0.85, block: 0.6, center: 0.4 }
+      : { win: 1, block: 0.9, center: 0.7 };
     const free = board.map((v, i) => (v ? null : i)).filter((v) => v !== null);
     const finishing = (mark) => {
       for (const [a, b, c] of LINES) {
@@ -317,10 +404,10 @@ function startTicTacToe() {
       return null;
     };
     const win = finishing('O');
-    if (win !== null && Math.random() < 0.85) return win;
+    if (win !== null && Math.random() < odds.win) return win;
     const block = finishing('X');
-    if (block !== null && Math.random() < 0.6) return block;
-    if (!board[4] && Math.random() < 0.4) return 4;
+    if (block !== null && Math.random() < odds.block) return block;
+    if (!board[4] && Math.random() < odds.center) return 4;
     return pick(free);
   }
 
@@ -333,19 +420,30 @@ function startTicTacToe() {
 }
 
 /* =========================================================
-   משחק 2: סיימון — את והמחשב חוזרים על אותו רצף.
-   מי שטועה ראשון — מפסיד.
+   משחק 2: סיימון — משחק לבד: חוזרים על רצף שמתארך ומנסים לשבור שיא.
+   רמת הקושי קובעת את המהירות.
    ========================================================= */
 
 const PADS = [
-  { cls: 'green',  name: 'ירוק',  freq: 392 },
-  { cls: 'red',    name: 'אדום',  freq: 330 },
-  { cls: 'yellow', name: 'צהוב',  freq: 262 },
-  { cls: 'blue',   name: 'כחול',  freq: 523 },
+  { cls: 'green',  name: 'ירוק',  freq: 784 },
+  { cls: 'red',    name: 'אדום',  freq: 659 },
+  { cls: 'yellow', name: 'צהוב',  freq: 523 },
+  { cls: 'blue',   name: 'כחול',  freq: 1047 },
 ];
+
+const SIMON_SPEED = {
+  easy:   { on: 750, off: 420 },
+  medium: { on: 520, off: 280 },
+  hard:   { on: 360, off: 180 },
+};
 
 function startSimon() {
   const ui = gameScreen('סיימון', 'simon');
+  const lvl = level.get();
+  const speed = SIMON_SPEED[lvl];
+  const bestKey = 'gg-simon-best-' + lvl;
+  let best = 0;
+  try { best = Number(localStorage.getItem(bestKey)) || 0; } catch { /* לא נורא */ }
   const seq = [];
   let input = [];
   let accepting = false;
@@ -353,16 +451,16 @@ function startSimon() {
   const grid = h('div', { class: 'simon' });
   const pads = PADS.map((p, i) => {
     const b = h('button', { class: `pad ${p.cls}`, text: p.name });
-    onTap(b, () => playerPress(i), { gap: 300 });
+    onTap(b, () => playerPress(i), { gap: 250 });
     grid.append(b);
     return b;
   });
   const roundEl = h('div', { class: 'scoreline' });
   ui.body.append(roundEl, grid);
 
-  async function flash(i, ms = 650) {
+  async function flash(i, ms = speed.on) {
     pads[i].classList.add('lit');
-    sound.tone(PADS[i].freq, ms, 'sine', 0.3);
+    sound.tone(PADS[i].freq, ms, 'triangle', 0.4);
     await wait(ms);
     pads[i].classList.remove('lit');
   }
@@ -370,15 +468,19 @@ function startSimon() {
   async function playSequence() {
     for (const i of seq) {
       await flash(i);
-      await wait(350);
+      await wait(speed.off);
     }
+  }
+
+  function showRound() {
+    roundEl.innerHTML = '';
+    roundEl.append(h('span', {}, 'שלב: ', h('b', { text: String(seq.length) })),
+                   h('span', {}, 'השיא שלך: ', h('b', { text: String(best) })));
   }
 
   async function nextRound() {
     seq.push(rand(4));
-    roundEl.innerHTML = '';
-    roundEl.append(h('span', {}, 'שלב: ', h('b', { text: String(seq.length) })),
-                   h('span', {}, 'צבעים לזכור: ', h('b', { text: String(seq.length) })));
+    showRound();
     accepting = false;
     ui.setStatus('👀 הסתכלי טוב…', 'bot');
     await wait(1100);
@@ -399,41 +501,279 @@ function startSimon() {
         ui.setStatus('אופס… זה היה הרצף הנכון:', 'bot');
         await wait(900);
         await playSequence();
-        ui.finish('המחשב ניצח הפעם 🙂', 'bot', startSimon);
+        gameOver();
       }, 500);
       return;
     }
     if (input.length === seq.length) {
       accepting = false;
-      later(() => botTurn(), 700);
+      later(async () => {
+        ui.setStatus('👏 נכון! מוסיפים עוד צבע…', 'you');
+        await wait(1300);
+        nextRound();
+      }, 600);
     }
   }
 
-  async function botTurn() {
-    ui.setStatus('👏 נכון! עכשיו תור המחשב…', 'bot');
-    await wait(1300);
-    // הסיכוי של המחשב לטעות גדל ככל שהרצף ארוך יותר
-    const errChance = Math.min(0.6, Math.max(0, (seq.length - 2) * 0.13));
-    const willFail = Math.random() < errChance;
-    const failAt = willFail ? rand(seq.length) : -1;
-    for (let k = 0; k < seq.length; k++) {
-      if (k === failAt) {
-        let wrong;
-        do { wrong = rand(4); } while (wrong === seq[k]);
-        await flash(wrong, 500);
-        await wait(400);
-        ui.finish('🎉 המחשב טעה — ניצחת!', 'you', startSimon);
-        return;
-      }
-      await flash(seq[k], 500);
-      await wait(300);
+  function gameOver() {
+    const done = seq.length - 1;
+    const colors = done === 1 ? 'צבע אחד' : `${done} צבעים`;
+    if (done > best) {
+      try { localStorage.setItem(bestKey, String(done)); } catch { /* לא נורא */ }
+      best = done;
+      showRound();
+      ui.finish(`🏆 שיא חדש! זכרת ${colors}`, 'you', startSimon, false);
+    } else if (done > 0) {
+      ui.finish(`כל הכבוד! זכרת ${colors} ברצף`, null, startSimon, false);
+    } else {
+      ui.finish('לא נורא, ננסה שוב? 🙂', null, startSimon, false);
     }
-    ui.setStatus('המחשב הצליח. ממשיכים — הרצף מתארך!', 'bot');
-    await wait(1400);
-    nextRound();
   }
 
   nextRound();
+}
+
+/* =========================================================
+   משחק 4: ארבע בשורה — מול המחשב.
+   לחיצה ראשונה על טור מסמנת אותו, לחיצה שנייה על אותו טור מפילה דיסקית.
+   ========================================================= */
+
+const C4_ROWS = 6;
+const C4_COLS = 7;
+const C4_ORDER = [3, 2, 4, 1, 5, 0, 6]; // מהמרכז החוצה
+const C4_DIRS = [[0, 1], [1, 0], [1, 1], [1, -1]];
+const YOU = 1;
+const BOT = 2;
+
+let c4YouStart = true;
+
+function c4Land(b, c) {
+  for (let r = C4_ROWS - 1; r >= 0; r--) if (!b[r][c]) return r;
+  return -1;
+}
+function c4Valid(b) { return C4_ORDER.filter((c) => !b[0][c]); }
+
+// מחזיר את ארבע המשבצות המנצחות (או null)
+function c4FindWin(b, onlyP) {
+  for (let r = 0; r < C4_ROWS; r++) {
+    for (let c = 0; c < C4_COLS; c++) {
+      const p = b[r][c];
+      if (!p || (onlyP && p !== onlyP)) continue;
+      for (const [dr, dc] of C4_DIRS) {
+        const er = r + 3 * dr, ec = c + 3 * dc;
+        if (er < 0 || er >= C4_ROWS || ec < 0 || ec >= C4_COLS) continue;
+        if (b[r + dr][c + dc] === p && b[r + 2 * dr][c + 2 * dc] === p && b[er][ec] === p) {
+          return [0, 1, 2, 3].map((k) => [r + k * dr, c + k * dc]);
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function c4WinsWith(b, c, p) {
+  const r = c4Land(b, c);
+  if (r < 0) return false;
+  b[r][c] = p;
+  const w = !!c4FindWin(b, p);
+  b[r][c] = 0;
+  return w;
+}
+
+// האם המהלך מאפשר ליריב לנצח מיד מעליו?
+function c4GivesAway(b, c) {
+  const r = c4Land(b, c);
+  b[r][c] = BOT;
+  const bad = r > 0 && c4WinsWith(b, c, YOU);
+  b[r][c] = 0;
+  return bad;
+}
+
+function c4Weighted(cols) {
+  const weights = cols.map((c) => 4 - Math.abs(c - 3));
+  let x = Math.random() * weights.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < cols.length; i++) { x -= weights[i]; if (x <= 0) return cols[i]; }
+  return cols[cols.length - 1];
+}
+
+// הערכת לוח מנקודת המבט של המחשב
+function c4Score(b) {
+  let score = 0;
+  for (let r = 0; r < C4_ROWS; r++) {
+    if (b[r][3] === BOT) score += 3; else if (b[r][3] === YOU) score -= 3;
+  }
+  for (let r = 0; r < C4_ROWS; r++) {
+    for (let c = 0; c < C4_COLS; c++) {
+      for (const [dr, dc] of C4_DIRS) {
+        const er = r + 3 * dr, ec = c + 3 * dc;
+        if (er < 0 || er >= C4_ROWS || ec < 0 || ec >= C4_COLS) continue;
+        let bot = 0, you = 0;
+        for (let k = 0; k < 4; k++) {
+          const v = b[r + k * dr][c + k * dc];
+          if (v === BOT) bot++; else if (v === YOU) you++;
+        }
+        if (bot && you) continue;
+        if (bot === 3) score += 6; else if (bot === 2) score += 2;
+        if (you === 3) score -= 8; else if (you === 2) score -= 2;
+      }
+    }
+  }
+  return score;
+}
+
+function c4Negamax(b, depth, alpha, beta, p) {
+  if (c4FindWin(b, 3 - p)) return -100000 - depth; // השחקן הקודם ניצח
+  const moves = c4Valid(b);
+  if (!moves.length) return 0;
+  if (depth === 0) return p === BOT ? c4Score(b) : -c4Score(b);
+  let best = -Infinity;
+  for (const c of moves) {
+    const r = c4Land(b, c);
+    b[r][c] = p;
+    const v = -c4Negamax(b, depth - 1, -beta, -alpha, 3 - p);
+    b[r][c] = 0;
+    if (v > best) best = v;
+    if (v > alpha) alpha = v;
+    if (alpha >= beta) break;
+  }
+  return best;
+}
+
+function c4Choose(b, lvl) {
+  const moves = c4Valid(b);
+  const win = moves.find((c) => c4WinsWith(b, c, BOT));
+  const block = moves.find((c) => c4WinsWith(b, c, YOU));
+
+  if (lvl === 'easy') {
+    if (win !== undefined && Math.random() < 0.8) return win;
+    if (block !== undefined && Math.random() < 0.5) return block;
+    return c4Weighted(moves);
+  }
+  if (lvl === 'medium') {
+    if (win !== undefined) return win;
+    if (block !== undefined && Math.random() < 0.9) return block;
+    const safe = moves.filter((c) => !c4GivesAway(b, c));
+    return c4Weighted(safe.length ? safe : moves);
+  }
+  // קשה: חושב כמה מהלכים קדימה
+  if (win !== undefined) return win;
+  if (block !== undefined) return block;
+  let bestCol = moves[0], bestVal = -Infinity;
+  for (const c of moves) {
+    const r = c4Land(b, c);
+    b[r][c] = BOT;
+    const v = -c4Negamax(b, 5, -Infinity, Infinity, YOU);
+    b[r][c] = 0;
+    if (v > bestVal) { bestVal = v; bestCol = c; }
+  }
+  return bestCol;
+}
+
+function startConnectFour() {
+  const ui = gameScreen('ארבע בשורה', 'c4');
+  const lvl = level.get();
+  const board = Array.from({ length: C4_ROWS }, () => Array(C4_COLS).fill(0));
+  let busy = true;
+  let over = false;
+  let selected = null;
+
+  const grid = h('div', { class: 'c4' });
+  const cols = [];
+  const cells = Array.from({ length: C4_ROWS }, () => []);
+  for (let c = 0; c < C4_COLS; c++) {
+    const col = h('button', { class: 'c4-col', 'aria-label': `טור ${c + 1}` });
+    for (let r = 0; r < C4_ROWS; r++) {
+      const d = h('span', { class: 'c4-cell' });
+      col.append(d);
+      cells[r][c] = d;
+    }
+    onTap(col, () => playerTap(c), { gap: 450 });
+    grid.append(col);
+    cols.push(col);
+  }
+  ui.body.append(
+    h('div', { class: 'scoreline' },
+      h('span', {}, 'את: ', h('span', { class: 'disc you' })),
+      h('span', {}, 'המחשב: ', h('span', { class: 'disc bot' })),
+    ),
+    grid,
+  );
+
+  function render() {
+    const ghostRow = selected === null ? -1 : c4Land(board, selected);
+    for (let r = 0; r < C4_ROWS; r++) {
+      for (let c = 0; c < C4_COLS; c++) {
+        const v = board[r][c];
+        const keep = cells[r][c].classList.contains('win') ? ' win' : '';
+        cells[r][c].className = 'c4-cell' + (v === YOU ? ' you' : v === BOT ? ' bot' : '') +
+          (c === selected && r === ghostRow ? ' ghost' : '') + keep;
+      }
+    }
+    cols.forEach((col, c) => col.classList.toggle('selected', c === selected));
+  }
+
+  function drop(c, p) {
+    const r = c4Land(board, c);
+    board[r][c] = p;
+    render();
+    cells[r][c].classList.add('drop');
+    sound.tone(p === YOU ? 880 : 660, 160, 'triangle', 0.35);
+  }
+
+  function playerTap(c) {
+    if (busy || over) return;
+    if (c4Land(board, c) < 0) {
+      ui.setStatus('הטור הזה מלא, בחרי טור אחר', 'you');
+      return;
+    }
+    if (selected !== c) {
+      selected = c;
+      sound.click();
+      render();
+      ui.setStatus('לחצי שוב על אותו טור כדי להפיל', 'you');
+      return;
+    }
+    selected = null;
+    drop(c, YOU);
+    if (checkEnd()) return;
+    botTurn();
+  }
+
+  function checkEnd() {
+    const w = c4FindWin(board);
+    const full = board[0].every(Boolean);
+    if (!w && !full) return false;
+    over = true;
+    busy = true;
+    if (w) w.forEach(([r, c]) => cells[r][c].classList.add('win'));
+    c4YouStart = !c4YouStart;
+    const winner = w ? board[w[0][0]][w[0][1]] : 0;
+    later(() => {
+      if (winner === YOU) ui.finish('🎉 ניצחת! כל הכבוד!', 'you', startConnectFour);
+      else if (winner === BOT) ui.finish('המחשב ניצח הפעם 🙂', 'bot', startConnectFour);
+      else ui.finish('תיקו! 🤝', null, startConnectFour);
+    }, 900);
+    return true;
+  }
+
+  function botTurn() {
+    busy = true;
+    ui.setStatus('המחשב חושב… 🤔', 'bot');
+    later(() => {
+      drop(c4Choose(board, lvl), BOT);
+      if (checkEnd()) return;
+      busy = false;
+      ui.setStatus('תורך! לחצי על טור', 'you');
+    }, 1100);
+  }
+
+  render();
+  if (c4YouStart) {
+    busy = false;
+    ui.setStatus('את מתחילה! לחצי על טור', 'you');
+  } else {
+    botTurn();
+  }
 }
 
 /* =========================================================
@@ -448,6 +788,8 @@ function startMemory() {
   const deck = shuffle([...SYMBOLS, ...SYMBOLS]);
   const state = deck.map(() => 'closed'); // closed | open | you | bot
   const botMemory = new Map(); // אינדקס -> סמל (זיכרון לא מושלם)
+  // כמה טוב המחשב זוכר, ובאיזה סיכוי הוא "מתבלבל"
+  const brain = { easy: { mem: 0.45, slip: 0.3 }, medium: { mem: 0.7, slip: 0.1 }, hard: { mem: 0.95, slip: 0 } }[level.get()];
   let opened = [];
   let turn = 'you';
   let busy = false;
@@ -477,7 +819,7 @@ function startMemory() {
   }
 
   function remember(i) {
-    if (Math.random() < 0.45) botMemory.set(i, deck[i]);
+    if (Math.random() < brain.mem) botMemory.set(i, deck[i]);
   }
 
   function flip(i) {
@@ -542,7 +884,7 @@ function startMemory() {
         if (known[x][1] === known[y][1]) { first = known[x][0]; second = known[y][0]; break; }
       }
     }
-    if (first === null || Math.random() < 0.3) {
+    if (first === null || Math.random() < brain.slip) {
       const unknown = closed.filter((i) => !botMemory.has(i));
       first = pick(unknown.length ? unknown : closed);
       second = null;

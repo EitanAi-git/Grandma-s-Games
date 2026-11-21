@@ -124,6 +124,23 @@ button:focus-visible { outline: 5px solid #ffb300; outline-offset: 3px; }
 .sound-btn:active { box-shadow: 0 2px 0 var(--line); }
 .sound-btn.off { color: var(--gray); border-color: var(--gray); background: #eee; }
 
+.level-box { margin-top: 40px; }
+.level-title { font-size: 30px; font-weight: bold; text-align: center; margin: 0 0 12px; }
+.level-row { display: flex; gap: 16px; }
+.level-btn {
+  flex: 1;
+  min-height: 88px;
+  font-size: 30px;
+  font-weight: bold;
+  border-radius: 20px;
+  background: #fff;
+  color: var(--ink);
+  border: 4px solid var(--line);
+  box-shadow: 0 6px 0 var(--line);
+}
+.level-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--line); }
+.level-btn.on { background: var(--blue); color: #fff; border-color: var(--blue-dark); box-shadow: 0 6px 0 var(--blue-dark); }
+
 /* ---------- מסך משחק ---------- */
 .topbar { margin-bottom: 14px; }
 .back-btn {
@@ -135,6 +152,12 @@ button:focus-visible { outline: 5px solid #ffb300; outline-offset: 3px; }
   text-align: center;
   font-size: 38px;
   margin: 8px 0 4px;
+}
+.game-level {
+  text-align: center;
+  font-size: 24px;
+  color: var(--gray);
+  margin: 0 0 6px;
 }
 .status {
   text-align: center;
@@ -214,6 +237,45 @@ button:focus-visible { outline: 5px solid #ffb300; outline-offset: 3px; }
 .pad.green  { background: #27ae60; }
 .pad.blue   { background: #2471c9; }
 .pad.yellow { background: #e1b000; }
+
+/* ---------- ארבע בשורה ---------- */
+.c4 {
+  direction: ltr;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  width: min(100%, 560px);
+  margin: 0 auto;
+  padding: 8px 6px;
+  background: var(--blue);
+  border-radius: 20px;
+}
+.c4-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 5px 3px;
+  background: transparent;
+  border: 3px solid transparent;
+  border-radius: 14px;
+}
+.c4-col.selected { background: rgba(255,255,255,.28); border-color: #ffd23f; }
+.c4-cell {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--bg);
+  box-shadow: inset 0 3px 4px rgba(0,0,0,.25);
+}
+.c4-cell.you, .disc.you { background: #f5c400; box-shadow: inset 0 -4px 0 rgba(0,0,0,.2); }
+.c4-cell.bot, .disc.bot { background: #d63031; box-shadow: inset 0 -4px 0 rgba(0,0,0,.25); }
+.c4-cell.ghost { background: #fbe48a; outline: 3px dashed #f5c400; animation: blink 1s infinite; }
+.c4-cell.win { outline: 5px solid #fff; animation: blink .8s infinite; }
+.c4-cell.drop { animation: drop .35s ease-in; }
+@keyframes drop { from { transform: translateY(-400%); } to { transform: none; } }
+@keyframes blink { 50% { opacity: .55; } }
+.disc { display: inline-block; width: 1.1em; height: 1.1em; border-radius: 50%; vertical-align: middle; }
 
 /* ---------- זיכרון ---------- */
 .memory {
