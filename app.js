@@ -781,11 +781,19 @@ function startConnectFour() {
    מי שמוצא זוג — ממשיך. מי שמצא יותר זוגות — מנצח.
    ========================================================= */
 
-const SYMBOLS = ['🍎', '🌸', '🐱', '🐶', '🌞', '🚗'];
+const SYMBOLS = ['🍎', '🌸', '🐱', '🐶', '🌞', '🚗', '🐟', '🌳', '⭐', '🍌'];
+// מספר הזוגות והעמודות לפי רמת הקושי
+const MEMORY_SIZE = {
+  easy:   { pairs: 6,  cols: 3 }, // 12 קלפים
+  medium: { pairs: 8,  cols: 4 }, // 16 קלפים
+  hard:   { pairs: 10, cols: 4 }, // 20 קלפים
+};
 
 function startMemory() {
   const ui = gameScreen('זיכרון', 'memory');
-  const deck = shuffle([...SYMBOLS, ...SYMBOLS]);
+  const size = MEMORY_SIZE[level.get()];
+  const symbols = SYMBOLS.slice(0, size.pairs);
+  const deck = shuffle([...symbols, ...symbols]);
   const state = deck.map(() => 'closed'); // closed | open | you | bot
   const botMemory = new Map(); // אינדקס -> סמל (זיכרון לא מושלם)
   // כמה טוב המחשב זוכר, ובאיזה סיכוי הוא "מתבלבל"
@@ -796,7 +804,7 @@ function startMemory() {
   const score = { you: 0, bot: 0 };
 
   const scoreEl = h('div', { class: 'scoreline' });
-  const grid = h('div', { class: 'memory' });
+  const grid = h('div', { class: `memory cols-${size.cols}` });
   const cards = deck.map((_, i) => {
     const c = h('button', { class: 'mcard', 'aria-label': `קלף ${i + 1}` });
     onTap(c, () => { if (turn === 'you' && !busy) flip(i); }, { gap: 500 });

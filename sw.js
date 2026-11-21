@@ -1,4 +1,4 @@
-const CACHE = 'grandma-games-v4';
+const CACHE = 'grandma-games-v5';
 const FILES = [
   './', './index.html', './style.css', './app.js', './manifest.json',
   './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png'
