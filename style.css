@@ -197,6 +197,18 @@ button:focus-visible { outline: 5px solid #ffb300; outline-offset: 3px; }
 }
 .status.you { background: #e3f6e5; border-color: var(--green); color: var(--green-dark); }
 .status.bot { background: #eef3fb; border-color: var(--blue); color: var(--blue-dark); }
+.status.red { background: #fdeceb; border-color: var(--red); color: #8e2a20; }
+.status.yellow { background: #fff6cc; border-color: #d9a800; color: #7a5a00; }
+
+/* מול חבר/ה: מי שתורו מסומן במסגרת */
+.scoreline.chips { gap: 12px; }
+.chip {
+  padding: 2px 14px;
+  border-radius: 16px;
+  border: 3px solid transparent;
+  white-space: nowrap;
+}
+.chip.active { border-color: var(--ink); background: #fff; font-weight: bold; }
 
 .scoreline {
   display: flex;
@@ -304,6 +316,7 @@ button:focus-visible { outline: 5px solid #ffb300; outline-offset: 3px; }
 .c4-cell.you, .disc.you { background: #f5c400; box-shadow: inset 0 -4px 0 rgba(0,0,0,.2); }
 .c4-cell.bot, .disc.bot { background: #d63031; box-shadow: inset 0 -4px 0 rgba(0,0,0,.25); }
 .c4-cell.ghost { background: #fbe48a; outline: 3px dashed #f5c400; animation: blink 1s infinite; }
+.c4-cell.ghost.ghost-red { background: #f2a39e; outline-color: #d63031; }
 .c4-cell.win { outline: 5px solid #fff; animation: blink .8s infinite; }
 .c4-cell.drop { animation: drop .35s ease-in; }
 @keyframes drop { from { transform: translateY(-400%); } to { transform: none; } }

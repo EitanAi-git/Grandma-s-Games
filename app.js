@@ -85,6 +85,25 @@ const level = {
   name() { return LEVELS.find((l) => l.id === this.get()).name; },
 };
 
+/* ---------- נגד מי משחקים: המחשב או חבר/ה (על אותו טלפון) ---------- */
+const mode = {
+  get() {
+    try { return localStorage.getItem('gg-mode') === 'friend' ? 'friend' : 'bot'; } catch { return 'bot'; }
+  },
+  set(v) { try { localStorage.setItem('gg-mode', v); } catch { /* לא נורא */ } },
+  friends() { return this.get() === 'friend'; },
+};
+
+// שורת "תור": שני שחקנים, מי שתורו מסומן במסגרת
+function turnChips(a, b) {
+  const chipA = h('span', { class: 'chip' }, ...a);
+  const chipB = h('span', { class: 'chip' }, ...b);
+  return {
+    el: h('div', { class: 'scoreline chips' }, chipA, chipB),
+    set(first) { chipA.classList.toggle('active', first); chipB.classList.toggle('active', !first); },
+  };
+}
+
 /* ---------- צלילים ---------- */
 const sound = {
   ctx: null,
@@ -200,7 +219,7 @@ function fit(board) {
   return h('div', { class: 'fit' }, board);
 }
 
-function gameScreen(title, gameId) {
+function gameScreen(title, gameId, opts = {}) {
   clearTimers();
   if (!inGame) history.pushState({ game: true }, '');
   inGame = true;
@@ -212,7 +231,7 @@ function gameScreen(title, gameId) {
   const status = h('div', { class: 'status' });
   const body = h('div', { class: 'game-body' });
   const footer = h('div');
-  app.append(h('div', { class: 'topbar game-top' }, back, h('h1', { class: 'game-title', text: title }), soundToggle()), h('p', { class: 'game-level', text: 'רמה: ' + level.name() }), status, body, footer);
+  app.append(h('div', { class: 'topbar game-top' }, back, h('h1', { class: 'game-title', text: title }), soundToggle()), h('p', { class: 'game-level', text: opts.friends ? '👥 שני שחקנים' + (opts.showLevel ? ' · רמה: ' + level.name() : '') : 'רמה: ' + level.name() }), status, body, footer);
 
   return {
     body,
@@ -221,11 +240,13 @@ function gameScreen(title, gameId) {
       status.className = 'status' + (who ? ' ' + who : '');
     },
     // מסך סיום עם "לשחק שוב"
-    finish(text, who, restart, countScore = true) {
-      if (who === 'you') { sound.win(); if (countScore) store.win(gameId, 'you'); }
-      else if (who === 'bot') { sound.lose(); if (countScore) store.win(gameId, 'bot'); }
+    // who: 'you' (ניצחון), 'bot' (הפסד), null (תיקו). opts.count=false: לא נספר בטבלה. opts.cls: צבע תיבת הסטטוס
+    finish(text, who, restart, fopts = {}) {
+      const count = fopts.count !== false && !opts.friends;
+      if (who === 'you') { sound.win(); if (count) store.win(gameId, 'you'); }
+      else if (who === 'bot') { sound.lose(); if (count) store.win(gameId, 'bot'); }
       else sound.draw();
-      this.setStatus(text, who === 'you' ? 'you' : who === 'bot' ? 'bot' : '');
+      this.setStatus(text, fopts.cls ?? (who === 'you' ? 'you' : who === 'bot' ? 'bot' : ''));
       footer.innerHTML = '';
       const again = h('button', { class: 'big-btn green', text: '🔄 לשחק שוב' });
       const home = h('button', { class: 'big-btn light', text: '🏠 לתפריט הראשי' });
@@ -256,6 +277,28 @@ function soundToggle() {
   }, { gap: 700 });
   render();
   return btn;
+}
+
+// בחירה: נגד המחשב או נגד חבר/ה. שני כפתורים גדולים, הנבחר מסומן בבירור
+function modePicker() {
+  const row = h('div', { class: 'level-row' });
+  const opts = [{ id: 'bot', name: '🤖 המחשב' }, { id: 'friend', name: '👥 חבר' }];
+  const btns = opts.map((o) => {
+    const b = h('button', { class: 'level-btn mode-btn' });
+    onTap(b, () => { mode.set(o.id); render(); }, { gap: 600 });
+    row.append(b);
+    return [o, b];
+  });
+  function render() {
+    const cur = mode.get();
+    for (const [o, b] of btns) {
+      b.textContent = (o.id === cur ? '✓ ' : '') + o.name;
+      b.classList.toggle('on', o.id === cur);
+      b.setAttribute('aria-pressed', String(o.id === cur));
+    }
+  }
+  render();
+  return h('div', { class: 'level-box' }, h('p', { class: 'level-title', text: 'משחקים נגד:' }), row);
 }
 
 // בחירת רמת קושי: שלושה כפתורים גדולים, הנבחר מסומן בבירור
@@ -309,6 +352,7 @@ function showHome() {
     h('h1', { class: 'home-title', text: 'המשחקים של סבתא' }),
     h('p', { class: 'home-sub', text: 'במה נשחק היום?' }),
     list,
+    modePicker(),
     levelPicker(),
     (you || bot) ? h('p', { class: 'home-score', text: `ניצחונות שלך: ${you}  ·  ניצחונות המחשב: ${bot}` }) : null,
     h('p', { class: 'version', text: 'גרסה ' + (self.APP_VERSION || '') }),
@@ -323,9 +367,12 @@ function showHome() {
 const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
 
 let tttYouStart = true;
+let tttXStarts = true; // מול חבר/ה: מי מתחיל מתחלף בכל משחק
 
 function startTicTacToe() {
-  const ui = gameScreen('איקס עיגול', 'ttt');
+  const friends = mode.friends();
+  const ui = gameScreen('איקס עיגול', 'ttt', { friends });
+  let turnMark = 'X'; // מול חבר/ה: של מי התור
   const board = Array(9).fill(null);
   let busy = true;
   let over = false;
@@ -337,13 +384,22 @@ function startTicTacToe() {
     grid.append(c);
     return c;
   });
+  const chips = friends ? turnChips(
+    ['שחקן ', h('b', { text: 'X', style: 'color:var(--green)' })],
+    ['שחקן ', h('b', { text: 'O', style: 'color:var(--red)' })],
+  ) : null;
   ui.body.append(
-    h('div', { class: 'scoreline' },
+    friends ? chips.el : h('div', { class: 'scoreline' },
       h('span', {}, 'את: ', h('b', { class: 'x-mark', text: 'X', style: 'color:var(--green)' })),
       h('span', {}, 'המחשב: ', h('b', { text: 'O', style: 'color:var(--red)' })),
     ),
     fit(grid),
   );
+
+  function friendPrompt() {
+    chips.set(turnMark === 'X');
+    ui.setStatus(`תור של ${turnMark}! לחצו על משבצת`, turnMark === 'X' ? 'you' : 'red');
+  }
 
   function place(i, mark) {
     board[i] = mark;
@@ -366,8 +422,13 @@ function startTicTacToe() {
     over = true;
     busy = true;
     if (w.line) w.line.forEach((i) => cells[i].classList.add('win'));
-    tttYouStart = !tttYouStart; // בפעם הבאה מתחיל השני
+    if (!friends) tttYouStart = !tttYouStart; // בפעם הבאה מתחיל השני
     later(() => {
+      if (friends) {
+        if (w.mark === 'draw') ui.finish('תיקו! 🤝', null, startTicTacToe);
+        else ui.finish(`🎉 ${w.mark} ניצח! כל הכבוד!`, 'you', startTicTacToe, { cls: w.mark === 'X' ? 'you' : 'red' });
+        return;
+      }
       if (w.mark === 'X') ui.finish('🎉 ניצחת! כל הכבוד!', 'you', startTicTacToe);
       else if (w.mark === 'O') ui.finish('המחשב ניצח הפעם 🙂', 'bot', startTicTacToe);
       else ui.finish('תיקו! 🤝', null, startTicTacToe);
@@ -377,6 +438,13 @@ function startTicTacToe() {
 
   function playerMove(i) {
     if (busy || over || board[i]) return;
+    if (friends) {
+      place(i, turnMark);
+      if (checkEnd()) return;
+      turnMark = turnMark === 'X' ? 'O' : 'X';
+      friendPrompt();
+      return;
+    }
     place(i, 'X');
     if (checkEnd()) return;
     botTurn();
@@ -442,7 +510,12 @@ function startTicTacToe() {
     return pick(free);
   }
 
-  if (tttYouStart) {
+  if (friends) {
+    turnMark = tttXStarts ? 'X' : 'O';
+    tttXStarts = !tttXStarts;
+    busy = false;
+    friendPrompt();
+  } else if (tttYouStart) {
     busy = false;
     ui.setStatus('את מתחילה! לחצי על משבצת', 'you');
   } else {
@@ -553,11 +626,11 @@ function startSimon() {
       try { localStorage.setItem(bestKey, String(done)); } catch { /* לא נורא */ }
       best = done;
       showRound();
-      ui.finish(`🏆 שיא חדש! זכרת ${colors}`, 'you', startSimon, false);
+      ui.finish(`🏆 שיא חדש! זכרת ${colors}`, 'you', startSimon, { count: false });
     } else if (done > 0) {
-      ui.finish(`כל הכבוד! זכרת ${colors} ברצף`, null, startSimon, false);
+      ui.finish(`כל הכבוד! זכרת ${colors} ברצף`, null, startSimon, { count: false });
     } else {
-      ui.finish('לא נורא, ננסה שוב? 🙂', null, startSimon, false);
+      ui.finish('לא נורא, ננסה שוב? 🙂', null, startSimon, { count: false });
     }
   }
 
@@ -577,6 +650,7 @@ const YOU = 1;
 const BOT = 2;
 
 let c4YouStart = true;
+let c4YellowStarts = true; // מול חבר/ה: מי מתחיל מתחלף בכל משחק
 
 function c4Land(b, c) {
   for (let r = C4_ROWS - 1; r >= 0; r--) if (!b[r][c]) return r;
@@ -701,8 +775,12 @@ function c4Choose(b, lvl) {
 }
 
 function startConnectFour() {
-  const ui = gameScreen('ארבע בשורה', 'c4');
+  const friends = mode.friends();
+  const ui = gameScreen('ארבע בשורה', 'c4', { friends });
   const lvl = level.get();
+  let turnP = YOU; // מול חבר/ה: של מי התור (YOU = צהוב, BOT = אדום)
+  const pName = (p) => (p === YOU ? 'הצהוב 🟡' : 'האדום 🔴');
+  const pCls = (p) => (p === YOU ? 'yellow' : 'red');
   const board = Array.from({ length: C4_ROWS }, () => Array(C4_COLS).fill(0));
   let busy = true;
   let over = false;
@@ -722,13 +800,22 @@ function startConnectFour() {
     grid.append(col);
     cols.push(col);
   }
+  const chips = friends ? turnChips(
+    ['צהוב ', h('span', { class: 'disc you' })],
+    ['אדום ', h('span', { class: 'disc bot' })],
+  ) : null;
   ui.body.append(
-    h('div', { class: 'scoreline' },
+    friends ? chips.el : h('div', { class: 'scoreline' },
       h('span', {}, 'את: ', h('span', { class: 'disc you' })),
       h('span', {}, 'המחשב: ', h('span', { class: 'disc bot' })),
     ),
     fit(grid),
   );
+
+  function friendPrompt() {
+    chips.set(turnP === YOU);
+    ui.setStatus(`תור ${pName(turnP)}! לחצו על טור`, pCls(turnP));
+  }
 
   function render() {
     const ghostRow = selected === null ? -1 : c4Land(board, selected);
@@ -737,7 +824,7 @@ function startConnectFour() {
         const v = board[r][c];
         const keep = cells[r][c].classList.contains('win') ? ' win' : '';
         cells[r][c].className = 'c4-cell' + (v === YOU ? ' you' : v === BOT ? ' bot' : '') +
-          (c === selected && r === ghostRow ? ' ghost' : '') + keep;
+          (c === selected && r === ghostRow ? ' ghost' + (friends && turnP === BOT ? ' ghost-red' : '') : '') + keep;
       }
     }
     cols.forEach((col, c) => col.classList.toggle('selected', c === selected));
@@ -754,17 +841,24 @@ function startConnectFour() {
   function playerTap(c) {
     if (busy || over) return;
     if (c4Land(board, c) < 0) {
-      ui.setStatus('הטור הזה מלא, בחרי טור אחר', 'you');
+      ui.setStatus(friends ? 'הטור הזה מלא, בחרו טור אחר' : 'הטור הזה מלא, בחרי טור אחר', friends ? pCls(turnP) : 'you');
       return;
     }
     if (selected !== c) {
       selected = c;
       sound.click();
       render();
-      ui.setStatus('לחצי שוב על אותו טור כדי להפיל', 'you');
+      ui.setStatus(friends ? 'לחצו שוב על אותו טור כדי להפיל' : 'לחצי שוב על אותו טור כדי להפיל', friends ? pCls(turnP) : 'you');
       return;
     }
     selected = null;
+    if (friends) {
+      drop(c, turnP);
+      if (checkEnd()) return;
+      turnP = 3 - turnP;
+      friendPrompt();
+      return;
+    }
     drop(c, YOU);
     if (checkEnd()) return;
     botTurn();
@@ -777,9 +871,14 @@ function startConnectFour() {
     over = true;
     busy = true;
     if (w) w.forEach(([r, c]) => cells[r][c].classList.add('win'));
-    c4YouStart = !c4YouStart;
+    if (!friends) c4YouStart = !c4YouStart;
     const winner = w ? board[w[0][0]][w[0][1]] : 0;
     later(() => {
+      if (friends) {
+        if (!winner) ui.finish('תיקו! 🤝', null, startConnectFour);
+        else ui.finish(`🎉 ${pName(winner)} ניצח!`, 'you', startConnectFour, { cls: pCls(winner) });
+        return;
+      }
       if (winner === YOU) ui.finish('🎉 ניצחת! כל הכבוד!', 'you', startConnectFour);
       else if (winner === BOT) ui.finish('המחשב ניצח הפעם 🙂', 'bot', startConnectFour);
       else ui.finish('תיקו! 🤝', null, startConnectFour);
@@ -799,7 +898,12 @@ function startConnectFour() {
   }
 
   render();
-  if (c4YouStart) {
+  if (friends) {
+    turnP = c4YellowStarts ? YOU : BOT;
+    c4YellowStarts = !c4YellowStarts;
+    busy = false;
+    friendPrompt();
+  } else if (c4YouStart) {
     busy = false;
     ui.setStatus('את מתחילה! לחצי על טור', 'you');
   } else {
@@ -820,8 +924,13 @@ const MEMORY_SIZE = {
   hard:   { pairs: 10, cols: 4 }, // 20 קלפים
 };
 
+let memGreenStarts = true; // מול חבר/ה: מי מתחיל מתחלף בכל משחק
+
 function startMemory() {
-  const ui = gameScreen('זיכרון', 'memory');
+  const friends = mode.friends();
+  const ui = gameScreen('זיכרון', 'memory', { friends, showLevel: true });
+  // מול חבר/ה: 'you' = הירוק, 'bot' = הכחול (אותם צבעים של הזוגות שנמצאו)
+  const pName = (t) => (t === 'you' ? '🟢 הירוק' : '🔵 הכחול');
   const size = MEMORY_SIZE[level.get()];
   const symbols = SYMBOLS.slice(0, size.pairs);
   const deck = shuffle([...symbols, ...symbols]);
@@ -842,7 +951,7 @@ function startMemory() {
   });
   const cards = deck.map((_, i) => {
     const c = h('button', { class: 'mcard', 'aria-label': `קלף ${i + 1}` });
-    onTap(c, () => { if (turn === 'you' && !busy) flip(i); }, { gap: 500 });
+    onTap(c, () => { if ((friends || turn === 'you') && !busy) flip(i); }, { gap: 500 });
     grid.append(c);
     return c;
   });
@@ -857,6 +966,14 @@ function startMemory() {
       else c.append(h('span', { class: 'face', text: deck[i] }));
     });
     scoreEl.innerHTML = '';
+    if (friends) {
+      scoreEl.className = 'scoreline chips';
+      scoreEl.append(
+        h('span', { class: 'chip' + (turn === 'you' ? ' active' : '') }, '🟢 ירוק: ', h('b', { text: String(score.you) })),
+        h('span', { class: 'chip' + (turn === 'bot' ? ' active' : '') }, '🔵 כחול: ', h('b', { text: String(score.bot) })),
+      );
+      return;
+    }
     scoreEl.append(h('span', {}, 'זוגות שלך: ', h('b', { text: String(score.you) })),
                    h('span', {}, 'המחשב: ', h('b', { text: String(score.bot) })));
   }
@@ -875,6 +992,8 @@ function startMemory() {
     if (opened.length === 2) {
       busy = true;
       later(checkPair, 900);
+    } else if (friends) {
+      ui.setStatus(`${pName(turn)}: הפכו עוד קלף`, turn);
     } else if (turn === 'you') {
       ui.setStatus('יופי! עכשיו הפכי קלף נוסף', 'you');
     }
@@ -890,7 +1009,10 @@ function startMemory() {
       sound.tone(784, 250);
       render();
       if (state.every((s) => s === 'you' || s === 'bot')) return endGame();
-      if (turn === 'you') {
+      if (friends) {
+        ui.setStatus(`🎉 ${pName(turn)} מצא זוג! עוד תור`, turn);
+        busy = false;
+      } else if (turn === 'you') {
         ui.setStatus('🎉 מצאת זוג! עוד תור בשבילך', 'you');
         busy = false;
       } else {
@@ -899,9 +1021,16 @@ function startMemory() {
       }
     } else {
       // נותנים זמן לראות את הקלפים לפני שהם נסגרים
-      ui.setStatus(turn === 'you' ? 'לא זוג. נסגור אותם…' : 'המחשב לא מצא זוג', turn);
+      ui.setStatus(friends || turn === 'you' ? 'לא זוג. נסגור אותם…' : 'המחשב לא מצא זוג', turn);
       later(() => {
         state[a] = state[b] = 'closed';
+        if (friends) {
+          turn = turn === 'you' ? 'bot' : 'you';
+          render();
+          busy = false;
+          ui.setStatus(`תור ${pName(turn)}! הפכו קלף`, turn);
+          return;
+        }
         render();
         if (turn === 'you') {
           turn = 'bot';
@@ -947,14 +1076,30 @@ function startMemory() {
 
   function endGame() {
     later(() => {
+      if (friends) {
+        const g = score.you, b = score.bot;
+        if (g === b) ui.finish('תיקו! 🤝', null, startMemory);
+        else {
+          const w = g > b ? 'you' : 'bot';
+          ui.finish(`🎉 ${pName(w)} ניצח! ${Math.max(g, b)} זוגות מול ${Math.min(g, b)}`, 'you', startMemory, { cls: w });
+        }
+        return;
+      }
       if (score.you > score.bot) ui.finish(`🎉 ניצחת! ${score.you} זוגות מול ${score.bot}`, 'you', startMemory);
       else if (score.bot > score.you) ui.finish(`המחשב ניצח הפעם, ${score.bot} מול ${score.you} 🙂`, 'bot', startMemory);
       else ui.finish('תיקו! 🤝', null, startMemory);
     }, 600);
   }
 
-  render();
-  ui.setStatus('תורך! הפכי קלף', 'you');
+  if (friends) {
+    turn = memGreenStarts ? 'you' : 'bot';
+    memGreenStarts = !memGreenStarts;
+    render();
+    ui.setStatus(`תור ${pName(turn)}! הפכו קלף`, turn);
+  } else {
+    render();
+    ui.setStatus('תורך! הפכי קלף', 'you');
+  }
 }
 
 /* =========================================================
